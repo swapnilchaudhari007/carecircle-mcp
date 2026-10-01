@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CareCircle · Alexa+ simulator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2713%27 fill=%27none%27 stroke=%27%23e8743b%27 stroke-width=%274%27/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f6f3ee; --panel: #ffffff; --ink: #1d2433; --muted: #6b7385; --line: #e7e2d9;
+    --accent: #e8743b; --accent-soft: #fdeee5; --teal: #0f8b8d; --teal-soft: #e3f4f3;
+    --ok: #2f9e6a; --ok-soft: #e4f5ec; --warn: #d99413; --warn-soft: #fcf3dd; --bad: #d64545; --bad-soft: #fbe6e6;
+    --device: #0d1220; --device-2: #161d31; --alexa: #22c3ee;
+    --radius: 18px; --shadow: 0 1px 2px rgba(20,24,40,.05), 0 8px 24px rgba(20,24,40,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Inter, system-ui, sans-serif; }
+  button { font: inherit; cursor: pointer; }
+  header.top { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.7); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: Fraunces, serif; font-size: 22px; }
+  .brand svg { flex: none; }
+  .tag { font: 600 11px Inter; letter-spacing: .06em; text-transform: uppercase; color: var(--teal); background: var(--teal-soft); padding: 4px 8px; border-radius: 99px; }
+  .spacer { flex: 1; }
+  .clock { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .clock .now { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 99px; padding: 6px 12px; font-size: 13px; color: var(--ink); }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  main { display: grid; grid-template-columns: minmax(360px, 460px) 1fr; gap: 24px; padding: 24px; max-width: 1440px; margin: 0 auto; }
+  @media (max-width: 980px) { main { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+
+  /* ---------- Echo-Show style device ---------- */
+  .device { background: linear-gradient(180deg, var(--device-2), var(--device)); border-radius: 28px; padding: 18px; color: #e9eefc; box-shadow: 0 30px 60px -20px rgba(13,18,32,.5); position: sticky; top: 84px; display: flex; flex-direction: column; height: calc(100vh - 110px); min-height: 620px; }
+  @media (max-width: 980px) { .device { position: static; height: 640px; } }
+  .persona { display: flex; gap: 6px; background: rgba(255,255,255,.06); border-radius: 99px; padding: 4px; align-self: flex-start; }
+  .persona button { border: 0; background: transparent; color: #aeb7d0; padding: 6px 12px; border-radius: 99px; font-size: 13px; }
+  .persona button.on { background: #fff; color: var(--device); font-weight: 600; }
+  .screen-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+  .dev-time { font: 600 28px Fraunces, serif; font-variant-numeric: tabular-nums; }
+  .dev-sub { color: #8f9ab8; font-size: 12px; }
+  .doses { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; scrollbar-width: none; }
+  .dose { flex: none; min-width: 112px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 8px 10px; font-size: 12px; }
+  .dose b { display: block; font-size: 13px; color: #fff; }
+  .dose .st { display: inline-block; margin-top: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; }
+  .st.taken { background: rgba(47,158,106,.25); color: #7ee2b0; }
+  .st.due, .st.overdue { background: rgba(232,116,59,.25); color: #ffb48d; }
+  .st.missed, .st.skipped { background: rgba(214,69,69,.25); color: #ff9c9c; }
+  .st.upcoming { background: rgba(255,255,255,.1); color: #b8c1da; }
+  .convo { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 6px 2px; scroll-behavior: smooth; }
+  .bubble { max-width: 88%; padding: 10px 14px; border-radius: 16px; font-size: 15px; line-height: 1.4; animation: pop .25s ease; }
+  .bubble.user { align-self: flex-end; background: #2b3550; border-bottom-right-radius: 4px; }
+  .bubble.alexa { align-self: flex-start; background: rgba(34,195,238,.12); border: 1px solid rgba(34,195,238,.25); border-bottom-left-radius: 4px; font-size: 17px; }
+  .bubble .tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .bubble .tools span { font: 500 11px ui-monospace, Menlo, monospace; background: rgba(255,255,255,.08); color: #9fe3f5; padding: 2px 6px; border-radius: 6px; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .suggest { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .suggest button { border: 1px solid rgba(255,255,255,.14); background: transparent; color: #cfd6ea; border-radius: 99px; padding: 5px 10px; font-size: 12px; }
+  @media (max-width: 640px) { .suggest { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .suggest button { flex: none; } }
+  .suggest button:hover { background: rgba(255,255,255,.08); }
+  .composer { display: flex; gap: 8px; align-items: center; }
+  .composer input { flex: 1; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); color: #fff; border-radius: 99px; padding: 12px 16px; font: inherit; outline: none; min-width: 0; }
+  .composer input:focus { border-color: var(--alexa); }
+  .mic { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--alexa); color: var(--device); display: grid; place-items: center; flex: none; }
+  .mic.listening { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,195,238,.6); } 100% { box-shadow: 0 0 0 16px rgba(34,195,238,0); } }
+  .ring { height: 4px; border-radius: 4px; margin-top: 12px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .ring.active::after { content: ""; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, transparent, var(--alexa), transparent); animation: sweep 1s linear infinite; }
+  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  .engine { color: #7e89a8; font-size: 11px; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
+
+  /* ---------- dashboard ---------- */
+  .dash { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; align-content: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .span-12 { grid-column: span 12; } .span-7 { grid-column: span 7; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-4 { grid-column: span 4; } .span-8 { grid-column: span 8; }
+  @media (max-width: 1200px) { .span-7, .span-5, .span-6, .span-4, .span-8 { grid-column: span 12; } }
+  .hero { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font: 600 24px Fraunces, serif; flex: none; }
+  .hero h2 { margin: 0; font: 600 24px Fraunces, serif; }
+  .hero p { margin: 2px 0 0; color: var(--muted); }
+  .status { margin-left: auto; padding: 10px 14px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .status.ok { background: var(--ok-soft); color: var(--ok); } .status.warn { background: var(--warn-soft); color: #9a6a0a; } .status.bad { background: var(--bad-soft); color: var(--bad); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { background: var(--bg); border-radius: 12px; padding: 12px; }
+  .kpi .v { font: 600 24px Fraunces, serif; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .alert { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; margin-bottom: 8px; align-items: flex-start; }
+  .alert.urgent { background: var(--bad-soft); } .alert.warning { background: var(--warn-soft); } .alert.info { background: var(--teal-soft); }
+  .alert .sev { font: 700 10px Inter; letter-spacing: .06em; text-transform: uppercase; padding: 3px 6px; border-radius: 6px; flex: none; margin-top: 2px; }
+  .alert.urgent .sev { background: var(--bad); color: #fff; } .alert.warning .sev { background: var(--warn); color: #fff; } .alert.info .sev { background: var(--teal); color: #fff; }
+  .alert .txt { flex: 1; font-size: 14px; }
+  .alert .when { color: var(--muted); font-size: 12px; }
+  .alert button { border: 0; background: rgba(255,255,255,.7); border-radius: 8px; padding: 4px 8px; font-size: 12px; flex: none; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .timeline { display: flex; flex-direction: column; gap: 6px; }
+  .tl { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+  .tl .t { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .tl .m small { color: var(--muted); display: block; font-size: 12px; }
+  .pill { font: 600 11px Inter; text-transform: uppercase; letter-spacing: .04em; padding: 3px 8px; border-radius: 99px; }
+  .pill.taken { background: var(--ok-soft); color: var(--ok); } .pill.due, .pill.overdue { background: var(--accent-soft); color: var(--accent); }
+  .pill.missed, .pill.skipped { background: var(--bad-soft); color: var(--bad); } .pill.upcoming { background: #eef0f4; color: var(--muted); }
+  .bars { display: flex; flex-direction: column; gap: 10px; }
+  .bar .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .bar .track { height: 8px; background: #efebe4; border-radius: 99px; overflow: hidden; }
+  .bar .fill { height: 100%; border-radius: 99px; background: var(--teal); transition: width .5s; }
+  .mood { display: flex; align-items: flex-end; gap: 8px; height: 110px; padding-top: 8px; }
+  .mood .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+  .mood .b { width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px; transition: height .4s; }
+  .mood .d { font-size: 11px; color: var(--muted); }
+  .refill { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .refill:last-child { border: 0; }
+  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+  .msg { padding: 8px 12px; border-radius: 12px; background: var(--bg); font-size: 14px; }
+  .msg .who { font-size: 12px; color: var(--muted); }
+  .msg.from_member { background: var(--accent-soft); }
+  .note { display: flex; gap: 8px; margin-top: 10px; }
+  .note input { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: inherit; min-width: 0; }
+  .note button, .btn { border: 0; background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+  .digest { font-size: 15px; line-height: 1.6; white-space: pre-wrap; min-height: 60px; }
+  .digest .src { display: block; color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .lang { display: flex; gap: 4px; }
+  .lang button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 8px; font-size: 12px; text-transform: none; letter-spacing: 0; }
+  .lang button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .trace { background: #0f1424; color: #c9d4f2; border-radius: 12px; padding: 12px; font: 12px/1.5 ui-monospace, Menlo, monospace; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+  .trace .k { color: #22c3ee; } .trace .c { color: #6f7a99; }
+  .notif { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+  .notif:last-child { border: 0; }
+  .notif .ch { font: 600 10px ui-monospace, monospace; background: var(--teal-soft); color: var(--teal); padding: 2px 6px; border-radius: 6px; height: fit-content; flex: none; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 24px 32px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#e8743b" stroke-width="3" stroke-dasharray="62 20" stroke-linecap="round"/><path d="M16 22s-6-3.6-6-8a3.4 3.4 0 0 1 6-2.2A3.4 3.4 0 0 1 22 14c0 4.4-6 8-6 8z" fill="#0f8b8d"/></svg>
+    CareCircle
+  </div>
+  <span class="tag">Alexa+ MCP</span>
+  <div class="spacer"></div>
+  <div class="clock" aria-label="Demo clock">
+    <span class="now" id="nowLabel">—</span>
+    <button class="chip" data-t="08:40">8:40 AM</button>
+    <button class="chip" data-t="12:30">12:30 PM</button>
+    <button class="chip" data-t="20:45">8:45 PM</button>
+    <button class="chip" data-t="">Live</button>
+    <button class="chip" id="resetBtn" title="Reset demo data">Reset</button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ Alexa+ device simulator ============ -->
+  <section class="device" aria-label="Alexa+ simulator">
+    <div class="screen-head">
+      <div>
+        <div class="dev-time" id="devTime">--:--</div>
+        <div class="dev-sub" id="devSub">Echo Show · Thane</div>
+      </div>
+      <div class="persona" role="tablist">
+        <button class="on" data-p="member" role="tab">Aai at home</button>
+        <button data-p="caregiver" role="tab">Son (caregiver)</button>
+      </div>
+    </div>
+    <div class="doses" id="devDoses"></div>
+    <div class="convo" id="convo" aria-live="polite"></div>
+    <div class="suggest" id="suggest"></div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Say something to Alexa…" aria-label="Message" />
+      <button type="button" class="mic" id="mic" aria-label="Speak">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
+      </button>
+    </form>
+    <div class="ring" id="ring"></div>
+    <div class="engine"><span id="engine">—</span><label><input type="checkbox" id="tts" checked /> voice</label></div>
+  </section>
+
+  <!-- ============ Family dashboard ============ -->
+  <section class="dash" aria-label="Family dashboard">
+    <div class="card span-12">
+      <div class="hero">
+        <div class="avatar" id="avatar">A</div>
+        <div>
+          <h2 id="memberName">—</h2>
+          <p id="memberSub">—</p>
+        </div>
+        <div class="status ok" id="status"><span class="dot"></span><span>All good</span></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kDoses">–</div><div class="l">doses today</div></div>
+        <div class="kpi"><div class="v" id="kAdh">–</div><div class="l">7-day adherence</div></div>
+        <div class="kpi"><div class="v" id="kMood">–</div><div class="l">latest mood</div></div>
+        <div class="kpi"><div class="v" id="kStreak">–</div><div class="l">perfect-day streak</div></div>
+      </div>
+    </div>
+
+    <div class="card span-7">
+      <h3>Needs attention <span id="alertCount"></span></h3>
+      <div id="alerts"></div>
+    </div>
+    <div class="card span-5">
+      <h3>Today</h3>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="card span-8">
+      <h3>Daily digest
+        <span class="lang" id="lang"><button class="on" data-l="en">EN</button><button data-l="hi">हिंदी</button><button data-l="mr">मराठी</button></span>
+      </h3>
+      <div class="digest" id="digest">Generating…</div>
+    </div>
+    <div class="card span-4">
+      <h3>Refills</h3>
+      <div id="refills"></div>
+    </div>
+
+    <div class="card span-6">
+      <h3>Adherence · 7 days</h3>
+      <div class="bars" id="bars"></div>
+    </div>
+    <div class="card span-6">
+      <h3>Mood check-ins</h3>
+      <div class="mood" id="mood"></div>
+    </div>
+
+    <div class="card span-6">
+      <h3>Messages</h3>
+      <div class="feed" id="feed"></div>
+      <form class="note" id="noteForm">
+        <input id="noteText" placeholder="Leave a message Alexa will read to Aai…" />
+        <button>Send</button>
+      </form>
+    </div>
+    <div class="card span-6">
+      <h3>Notifications sent to family</h3>
+      <div id="notifs"></div>
+    </div>
+
+    <div class="card span-12">
+      <h3>MCP inspector <span style="text-transform:none;letter-spacing:0;font-weight:500" id="proto"></span></h3>
+      <div class="trace" id="trace"><span class="c">// Talk to Alexa — every tools/call made to the CareCircle MCP server appears here.</span></div>
+    </div>
+  </section>
+</main>
+<footer>CareCircle is a care-coordination aid, not a medical device. It never changes doses or gives medical advice.</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let persona = "member", lang = "en", state = null, history = [], busy = false;
+
+const SUGGEST = {
+  member: ["Good morning", "What medicines do I take now?", "I took my sugar tablet", "I took my metformin", "I'm feeling a bit lonely today", "Tell Priya to bring vegetables", "Any messages for me?", "I feel dizzy, I need help"],
+  caregiver: ["How is Aai doing today?", "Any alerts?", "What's her adherence this week?", "Which medicines need a refill?", "Tell Aai I'll visit on Sunday", "Give me the update in Hindi"],
+};
+
+function fmtTime(iso, tz = "Asia/Kolkata") {
+  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: tz });
+}
+function ago(iso) {
+  const m = Math.round((new Date(state?.now ?? Date.now()) - new Date(iso)) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+  const h = Math.round(m / 60); if (h < 24) return h + " h ago"; return Math.round(h / 24) + " d ago";
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.json();
+}
+
+async function refresh() {
+  try { state = await api("/api/state"); render(); } catch (e) { console.error(e); }
+}
+
+function render() {
+  const s = state, tz = s.member.timezone;
+  $("#nowLabel").textContent = new Date(s.now).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: tz });
+  $("#devTime").textContent = fmtTime(s.now, tz);
+  $("#devSub").textContent = new Date(s.now).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: tz }) + " · Thane";
+  $("#engine").textContent = "Reasoning: " + s.engine;
+  $("#proto").textContent = "· Streamable HTTP · protocol " + s.protocol;
+
+  $("#devDoses").innerHTML = s.plan.slots.map((d) => `<div class="dose"><b>${esc(d.medication)}</b>${esc(d.timeSpoken)} · ${esc(d.dose)}<br><span class="st ${d.state}">${d.state}</span></div>`).join("");
+
+  $("#avatar").textContent = s.member.preferredName[0];
+  $("#memberName").textContent = `${s.member.preferredName} · ${s.member.name}`;
+  $("#memberSub").textContent = `${(s.member.conditions || []).join(" · ")} — circle: ${s.caregivers.map((c) => `${c.name} (${c.relation})`).join(", ")}`;
+  const worst = s.alerts.some((a) => a.severity === "urgent") ? "bad" : s.alerts.some((a) => a.severity === "warning") ? "warn" : "ok";
+  const st = $("#status"); st.className = "status " + worst;
+  st.lastElementChild.textContent = worst === "bad" ? "Urgent — please check" : worst === "warn" ? "Needs attention" : "All good";
+
+  const taken = s.plan.slots.filter((d) => d.state === "taken").length;
+  $("#kDoses").textContent = `${taken}/${s.plan.slots.length}`;
+  $("#kAdh").textContent = s.adherence.overallPct + "%";
+  const lastMood = s.checkIns[s.checkIns.length - 1];
+  $("#kMood").textContent = lastMood ? ["", "😞", "😕", "😐", "🙂", "😄"][lastMood.mood] + " " + lastMood.mood + "/5" : "–";
+  $("#kStreak").textContent = s.adherence.perfectDayStreak + "d";
+
+  $("#alertCount").textContent = s.alerts.length ? s.alerts.length + " open" : "";
+  $("#alerts").innerHTML = s.alerts.length ? s.alerts.map((a) => `<div class="alert ${a.severity}"><span class="sev">${a.severity}</span><div class="txt">${esc(a.text)}<div class="when">${ago(a.createdAt)}${a.notified ? " · family notified" : ""}</div></div><button data-ack="${esc(a.id)}">Handled</button></div>`).join("") : `<div class="empty">Nothing needs attention. 🌿</div>`;
+
+  $("#timeline").innerHTML = s.plan.slots.map((d) => `<div class="tl"><span class="t">${esc(d.timeSpoken)}</span><span class="m">${esc(d.medication)} ${esc(d.dose)}<small>${esc(d.instructions || d.purpose || "")}${d.loggedAt ? " · logged " + fmtTime(d.loggedAt, tz) : ""}</small></span><span class="pill ${d.state}">${d.state}</span></div>`).join("")
+    + s.plan.appointments.map((a) => `<div class="tl"><span class="t">${fmtTime(a.at, tz)}</span><span class="m">${esc(a.title)}<small>${esc(a.location || "")}</small></span><span class="pill upcoming">appt</span></div>`).join("");
+
+  $("#refills").innerHTML = s.refills.map((r) => `<div class="refill"><span>${esc(r.medication)}<br><small style="color:var(--muted)">${r.pillsRemaining} left · runs out ${new Date(r.runsOutOn).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</small></span><span class="pill ${r.daysLeft <= 2 ? "missed" : r.reorderNow ? "due" : "taken"}">${r.daysLeft}d</span></div>`).join("")
+    + (s.appointments[0] ? `<div class="refill"><span>Next visit<br><small style="color:var(--muted)">${esc(s.appointments[0].title)}</small></span><span class="pill upcoming">${new Date(s.appointments[0].at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span></div>` : "");
+
+  $("#bars").innerHTML = s.adherence.perMed.map((m) => `<div class="bar"><div class="row"><span>${esc(m.medication)}</span><span>${m.adherencePct}% <small style="color:var(--muted)">· ${m.taken}/${m.scheduled}${m.late ? ` · ${m.late} late` : ""}${m.missed ? ` · ${m.missed} missed` : ""}</small></span></div><div class="track"><div class="fill" style="width:${m.adherencePct}%;background:${m.adherencePct >= 90 ? "var(--teal)" : m.adherencePct >= 75 ? "var(--warn)" : "var(--bad)"}"></div></div></div>`).join("");
+
+  const mc = ["", "#d64545", "#e8743b", "#d9b313", "#5fb38a", "#2f9e6a"];
+  $("#mood").innerHTML = s.checkIns.map((c) => `<div class="col" title="${esc(c.note || "")}"><div class="b" style="height:${c.mood * 18}%;background:${mc[c.mood]}"></div><span class="d">${new Date(c.at).toLocaleDateString("en-IN", { weekday: "short", timeZone: tz })}</span></div>`).join("") || `<div class="empty">No check-ins yet.</div>`;
+
+  $("#feed").innerHTML = s.messages.slice().reverse().map((m) => `<div class="msg ${m.direction}"><div class="who">${esc(m.from)} → ${esc(m.to)} · ${ago(m.createdAt)}${m.direction === "to_member" ? (m.deliveredAt ? " · read aloud ✓" : " · waiting") : ""}</div>${esc(m.text)}</div>`).join("") || `<div class="empty">No messages yet.</div>`;
+
+  $("#notifs").innerHTML = s.notifications.length ? s.notifications.map((n) => `<div class="notif"><span class="ch">${esc(n.channel)}</span><span><b>${esc(n.subject)}</b> → ${esc(n.to.map((c) => c.name).join(", ") || "family")}<br><span style="color:var(--muted)">${esc(n.body)}</span></span></div>`).join("") : `<div class="empty">Alerts are pushed to the family via Amazon SNS (SMS / email). None sent yet this session.</div>`;
+}
+
+async function loadDigest() {
+  $("#digest").textContent = "Generating…";
+  try {
+    const d = await api("/api/digest?lang=" + lang);
+    $("#digest").innerHTML = esc(d.text) + `<span class="src">generated by ${esc(d.source)}</span>`;
+  } catch (e) { $("#digest").textContent = e.message; }
+}
+
+function renderSuggest() {
+  $("#suggest").innerHTML = SUGGEST[persona].map((t) => `<button type="button">${esc(t)}</button>`).join("");
+}
+
+function bubble(role, text, tools = []) {
+  const el = document.createElement("div");
+  el.className = "bubble " + role;
+  el.innerHTML = esc(text) + (tools.length ? `<div class="tools">${tools.map((t) => `<span>⚙ ${esc(t)}</span>`).join("")}</div>` : "");
+  $("#convo").appendChild(el);
+  $("#convo").scrollTop = $("#convo").scrollHeight;
+}
+
+function speak(text) {
+  if (!$("#tts").checked || !("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const hasDevanagari = /[ऀ-ॿ]/.test(text);
+  u.lang = hasDevanagari ? "hi-IN" : "en-IN";
+  const v = speechSynthesis.getVoices().find((v) => v.lang === u.lang) || speechSynthesis.getVoices().find((v) => v.lang.startsWith(hasDevanagari ? "hi" : "en"));
+  if (v) u.voice = v;
+  u.rate = persona === "member" ? 0.92 : 1;
+  speechSynthesis.speak(u);
+}
+
+function showTrace(turn, text) {
+  const lines = [`<span class="c">// "${esc(text)}"  ·  engine: ${esc(turn.engine)}</span>`];
+  if (!turn.trace.length) lines.push(`<span class="c">// (no tool calls)</span>`);
+  for (const s of turn.trace) {
+    lines.push(`<span class="k">→ tools/call</span> ${esc(s.tool)} ${esc(JSON.stringify(s.args))}`);
+    const { speak, ...rest } = s.result || {};
+    lines.push(`<span class="k">← result</span> <span class="c">(${s.ms} ms)</span> speak: ${esc(JSON.stringify(speak))}`);
+    const brief = JSON.stringify(rest);
+    lines.push(`<span class="c">   ${esc(brief.length > 420 ? brief.slice(0, 420) + "…" : brief)}</span>`);
+  }
+  $("#trace").innerHTML = lines.join("\n") + "\n\n" + $("#trace").innerHTML;
+}
+
+async function send(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true; $("#ring").classList.add("active");
+  bubble("user", text);
+  $("#say").value = "";
+  try {
+    const turn = await api("/api/agent", { text, history, persona });
+    bubble("alexa", turn.reply, turn.trace.map((t) => t.tool));
+    speak(turn.reply);
+    showTrace(turn, text);
+    history.push({ role: "user", text }, { role: "assistant", text: turn.reply });
+    history = history.slice(-8);
+    await refresh();
+    if (turn.trace.some((t) => !["get_todays_plan", "get_family_digest", "get_adherence_report", "refill_status"].includes(t.tool))) loadDigest();
+  } catch (e) {
+    bubble("alexa", "Sorry, I couldn't reach CareCircle: " + e.message);
+  } finally {
+    busy = false; $("#ring").classList.remove("active");
+  }
+}
+
+// ---------- events ----------
+$("#composer").addEventListener("submit", (e) => { e.preventDefault(); send($("#say").value); });
+$("#suggest").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") send(e.target.textContent); });
+document.querySelectorAll(".persona button").forEach((b) => b.addEventListener("click", () => {
+  persona = b.dataset.p; history = [];
+  document.querySelectorAll(".persona button").forEach((x) => x.classList.toggle("on", x === b));
+  renderSuggest();
+  bubble("alexa", persona === "member" ? "Namaste Aai! I'm here whenever you need me." : "Hi Swapnil. Ask me how Aai is doing.");
+}));
+$("#lang").addEventListener("click", (e) => {
+  if (!e.target.dataset.l) return;
+  lang = e.target.dataset.l;
+  $("#lang").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
+  loadDigest();
+});
+$("#alerts").addEventListener("click", async (e) => {
+  const id = e.target.dataset.ack; if (!id) return;
+  await api(`/api/alerts/${encodeURIComponent(id)}/ack`, {}); refresh();
+});
+$("#noteForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); const t = $("#noteText").value.trim(); if (!t) return;
+  await api("/api/message", { from: "Swapnil", text: t }); $("#noteText").value = ""; refresh();
+});
+document.querySelectorAll(".clock [data-t]").forEach((b) => b.addEventListener("click", async () => {
+  let iso = null;
+  if (b.dataset.t) {
+    const tz = state?.member.timezone || "Asia/Kolkata";
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    iso = new Date(`${day}T${b.dataset.t}:00+05:30`).toISOString();
+  }
+  await api("/api/clock", { iso });
+  document.querySelectorAll(".clock [data-t]").forEach((x) => x.classList.toggle("on", x === b));
+  await refresh(); loadDigest();
+}));
+$("#resetBtn").addEventListener("click", async () => {
+  await api("/api/reset", {}); $("#convo").innerHTML = ""; history = []; $("#trace").innerHTML = "";
+  bubble("alexa", "Demo reset. Namaste Aai!"); await refresh(); loadDigest();
+});
+
+// Voice input (Web Speech API)
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR(); rec.lang = "en-IN"; rec.interimResults = false;
+  rec.onresult = (e) => send(e.results[0][0].transcript);
+  rec.onend = () => $("#mic").classList.remove("listening");
+  $("#mic").addEventListener("click", () => { speechSynthesis?.cancel(); $("#mic").classList.add("listening"); rec.start(); });
+} else {
+  $("#mic").title = "Voice input needs Chrome"; $("#mic").addEventListener("click", () => $("#say").focus());
+}
+
+renderSuggest();
+bubble("alexa", "Namaste Aai! I'm here whenever you need me.");
+refresh().then(loadDigest);
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
