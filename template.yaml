@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: CareCircle — Alexa+ MCP server for elder medication care (Lambda + DynamoDB + Bedrock + SNS)
+
+Parameters:
+  McpAuthToken:
+    Type: String
+    NoEcho: true
+    Description: Bearer token clients (Alexa+ / inspector) must send to /mcp. Generate with `openssl rand -hex 24`.
+  BedrockModelId:
+    Type: String
+    Default: us.amazon.nova-pro-v1:0
+    Description: Bedrock model / inference profile used for the digest and the simulator agent.
+  CaregiverEmail:
+    Type: String
+    Default: ""
+    Description: Optional email subscribed to family alerts.
+  CaregiverPhone:
+    Type: String
+    Default: ""
+    Description: Optional E.164 phone number subscribed to SMS alerts (e.g. +919000000000).
+
+Conditions:
+  HasEmail: !Not [!Equals [!Ref CaregiverEmail, ""]]
+  HasPhone: !Not [!Equals [!Ref CaregiverPhone, ""]]
+
+Resources:
+  CareTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      SSESpecification: { SSEEnabled: true }
+
+  FamilyAlerts:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: CareCircle
+
+  EmailSub:
+    Type: AWS::SNS::Subscription
+    Condition: HasEmail
+    Properties: { TopicArn: !Ref FamilyAlerts, Protocol: email, Endpoint: !Ref CaregiverEmail }
+
+  SmsSub:
+    Type: AWS::SNS::Subscription
+    Condition: HasPhone
+    Properties: { TopicArn: !Ref FamilyAlerts, Protocol: sms, Endpoint: !Ref CaregiverPhone }
+
+  CareCircleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 1024
+      Timeout: 60
+      Architectures: [x86_64]
+      Environment:
+        Variables:
+          CARECIRCLE_TABLE: !Ref CareTable
+          SNS_TOPIC_ARN: !Ref FamilyAlerts
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          MCP_AUTH_TOKEN: !Ref McpAuthToken
+          AWS_LWA_PASS_THROUGH_PATH: /api/scan
+      FunctionUrlConfig:
+        AuthType: NONE # app-level bearer auth on /mcp
+        InvokeMode: BUFFERED
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref CareTable }
+        - SNSPublishMessagePolicy: { TopicName: !GetAtt FamilyAlerts.TopicName }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:Converse]
+              Resource: "*"
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: v1
+
+  # Proactive safety scan every 30 minutes (missed doses, silence, low mood, refills) even if nobody talks to Alexa.
+  SafetyScanSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      ScheduleExpression: rate(30 minutes)
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: !GetAtt CareCircleFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: '{"source":"carecircle.scheduler"}' # forwarded by Lambda Web Adapter to AWS_LWA_PASS_THROUGH_PATH
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: scheduler.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: invoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: lambda:InvokeFunction, Resource: !GetAtt CareCircleFunction.Arn }
+
+Outputs:
+  McpEndpoint:
+    Description: Register this Streamable HTTP endpoint with Alexa+ / any MCP client (send Authorization Bearer token)
+    Value: !Sub "${CareCircleFunctionUrl.FunctionUrl}mcp"
+  SimulatorUrl:
+    Description: Alexa+ simulator & family dashboard
+    Value: !GetAtt CareCircleFunctionUrl.FunctionUrl
+  AlertsTopic:
+    Value: !Ref FamilyAlerts
