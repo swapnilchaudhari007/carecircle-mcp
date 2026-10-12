@@ -1,0 +1,41 @@
+name: 🐛 Bug report
+description: Report something broken in CareCircle
+title: '[Bug]: '
+labels:
+- bug
+body:
+- type: input
+  id: area
+  attributes:
+    label: Affected area
+    description: e.g. MCP tools, Dose logging & double-dose guard, Missed-dose / refill alerts (SNS)
+  validations:
+    required: true
+- type: textarea
+  id: what
+  attributes:
+    label: What happened?
+    description: What did you expect, and what happened instead?
+  validations:
+    required: true
+- type: textarea
+  id: steps
+  attributes:
+    label: Steps to reproduce
+    placeholder: "1. \n2. \n3. "
+  validations:
+    required: true
+- type: dropdown
+  id: safety
+  attributes:
+    label: Could this affect medication safety?
+    options:
+    - 'No'
+    - 'Yes: a dose could be wrongly logged, allowed or missed'
+    - Not sure
+- type: textarea
+  id: logs
+  attributes:
+    label: Logs or screenshots
+    description: Remove keys, tokens and personal data first.
+    render: shell
