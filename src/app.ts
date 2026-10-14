@@ -40,7 +40,8 @@ export async function createApp(deps: AppDeps = {}) {
   function guard(req: Request, res: Response, next: NextFunction) {
     // DNS-rebinding protection required by the MCP Streamable HTTP spec: validate Origin when present.
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.length && !allowedOrigins.includes(origin)) {
+    // Origins not on the allowlist must at least match our own Host (blocks browser-based rebinding attacks).
+    if (origin && !allowedOrigins.includes(origin)) {
       try {
         if (new URL(origin).host !== req.headers.host) return void res.status(403).json(rpcError("Forbidden origin"));
       } catch {
@@ -168,8 +169,9 @@ export async function createApp(deps: AppDeps = {}) {
     "/api/message",
     wrap(async (req, res) => {
       const { from, text } = req.body ?? {};
-      if (!text) throw new Error("text required");
-      res.json(await care.leaveMessageForMember({ from: from || "Family", text }));
+      if (!text || typeof text !== "string" || !text.trim()) throw new Error("text required");
+      const sender = typeof from === "string" && from.trim() ? from.trim().slice(0, 60) : "Family";
+      res.json(await care.leaveMessageForMember({ from: sender, text: text.trim().slice(0, 1000) }));
     }),
   );
 
