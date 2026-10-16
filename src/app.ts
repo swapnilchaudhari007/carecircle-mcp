@@ -1,5 +1,6 @@
 // HTTP app: the MCP endpoint (Streamable HTTP, stateless) + the simulator/dashboard API and static UI.
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +37,12 @@ export async function createApp(deps: AppDeps = {}) {
   app.use(express.json({ limit: "1mb" }));
 
   // ---------- MCP endpoint ----------
+  // constant-time compare so the bearer token can't be guessed byte-by-byte from response timing
+  function sameSecret(given: string | undefined, expected: string): boolean {
+    const a = createHash("sha256").update(given ?? "").digest();
+    const b = createHash("sha256").update(expected).digest();
+    return timingSafeEqual(a, b);
+  }
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   function guard(req: Request, res: Response, next: NextFunction) {
     // DNS-rebinding protection required by the MCP Streamable HTTP spec: validate Origin when present.
@@ -48,7 +55,7 @@ export async function createApp(deps: AppDeps = {}) {
         return void res.status(403).json(rpcError("Bad origin"));
       }
     }
-    if (token && req.headers.authorization !== `Bearer ${token}`) {
+    if (token && !sameSecret(req.headers.authorization, `Bearer ${token}`)) {
       res.setHeader("WWW-Authenticate", 'Bearer realm="carecircle"');
       return void res.status(401).json(rpcError("Unauthorized"));
     }
