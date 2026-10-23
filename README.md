@@ -1,5 +1,7 @@
 # CareCircle: keeps the family close and Aai's medicines on track
 
+![MCP](https://img.shields.io/badge/MCP-2025--11--25-black) ![Alexa+](https://img.shields.io/badge/Alexa%2B-voice-00CAFF?logo=amazonalexa&logoColor=white) ![AWS](https://img.shields.io/badge/AWS-Lambda%20%C2%B7%20DynamoDB%20%C2%B7%20SNS%20%C2%B7%20Bedrock-FF9900?logo=amazonwebservices&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-Node-3178C6?logo=typescript&logoColor=white) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **An Alexa+ MCP server that helps older parents take their medicines safely and quietly keeps their children in the loop.**
 
 > Track: **Alexa+** (self-hosted MCP server, spec `2025-11-25`, Streamable HTTP)
